@@ -90,7 +90,7 @@ jobs:
           if [ ${#PROBLEM_FILES[@]} -gt 0 ]; then
             REPORT="このTexファイルに ${ALLOWED_LIST} 以外の年数がありました．もし使用したい場合は"n年前"といった表記にしてください"
             for f in "${PROBLEM_FILES[@]}"; do
-              REPORT+=" `$f` "
+              REPORT+="- $f\n"
             done
             echo -e "$REPORT"
             echo "::set-output name=message::$REPORT"
