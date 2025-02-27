@@ -29,17 +29,17 @@ jobs:
       - name: Year check
         id: year-check
         run: |
-          # GitHub に設定されているリポジトリ名は "owner/soukatu-2024-1" といった形式を想定
+          # GitHub に設定されているリポジトリ名は "owner/soukai-2024-1" といった形式を想定
           REPO_FULL="${{ github.repository }}"
           REPO_NAME="${REPO_FULL#*/}"
           echo "リポジトリ名: $REPO_NAME"
           
-          if [[ "$REPO_NAME" =~ ^soukatu-([0-9]{4})-([12])$ ]]; then
+          if [[ "$REPO_NAME" =~ ^soukai-([0-9]{4})-([12])$ ]]; then
             YEAR="${BASH_REMATCH[1]}"
             BATCH="${BASH_REMATCH[2]}"
             echo "抽出された年: $YEAR, バッチ: $BATCH"
           else
-            echo "リポジトリ名が予期した形式に一致しません。例: soukatu-<year>-<1 or 2>"
+            echo "リポジトリ名が予期した形式に一致しません。例: soukai-<year>-<1 or 2>"
             echo "::set-output name=failed::true"
             exit 1
           fi
