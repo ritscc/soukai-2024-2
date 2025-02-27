@@ -17,10 +17,8 @@ jobs:
       - name: Extracting modified .tex files
         id: changed-files
         run: |
-          # 変更された .tex ファイル一覧を抽出（各ファイルが改行区切りになる）
           FILES=$(git diff ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} --diff-filter=AM --name-only -- '*.tex')
           echo "対象ファイル: $FILES"
-          # GITHUB_OUTPUT を使ってマルチライン出力する
           echo "files<<EOF" >> $GITHUB_OUTPUT
           echo "$FILES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -44,7 +42,6 @@ jobs:
             exit 0
           fi
 
-          # バッチ番号が 1 の場合は YEAR のみ、2 の場合は YEAR および (YEAR+1) を許容する
           if [ "$BATCH" -eq 1 ]; then
             ALLOWED_YEARS=("$YEAR")
           else
@@ -61,8 +58,7 @@ jobs:
             echo "failed=false" >> $GITHUB_OUTPUT
             exit 0
           fi
-
-          # IFS を改行に設定して、各行（ファイル名）でループ処理できるようにする
+          
           IFS=$'\n'
           PROBLEM_FILES=()
 
@@ -119,5 +115,3 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           header: "[Year Check]"
           message: ${{ steps.year-check.outputs.message }}
-
-      # ※ このジョブは、問題があっても CI をエラー終了させず、PR のコメントで結果を更新します。
