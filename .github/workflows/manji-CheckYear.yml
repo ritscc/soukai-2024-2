@@ -35,8 +35,8 @@ jobs:
             echo "抽出された年: $YEAR, バッチ: $BATCH"
           else
             echo "リポジトリ名が予期した形式に一致しません。例: soukai-<year>-<1 or 2>"
-            echo "::set-output name=message::リポジトリ名の形式が正しくありません: $REPO_NAME"
-            echo "::set-output name=failed::false"
+            echo "message=リポジトリ名の形式が正しくありません: $REPO_NAME" >> $GITHUB_OUTPUT
+            echo "failed=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -53,8 +53,8 @@ jobs:
           FILES="${{ steps.changed-files.outputs.files }}"
           if [ -z "$FILES" ]; then
             echo "変更された .tex ファイルはありません。"
-            echo "::set-output name=message::変更された .tex ファイルはありませんでした。"
-            echo "::set-output name=failed::false"
+            echo "message=変更された .tex ファイルはありませんでした。" >> $GITHUB_OUTPUT
+            echo "failed=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -88,21 +88,26 @@ jobs:
           done
 
           if [ ${#PROBLEM_FILES[@]} -gt 0 ]; then
+            # ヘッダー部分：複数の場合と1つの場合で文言を変える
             if [ ${#PROBLEM_FILES[@]} -gt 1 ]; then
               REPORT="以下のTexファイルに ${ALLOWED_LIST} 以外の年数がありました．もし使用したい場合は \"n年前\" といった表記にしてください:"
             else
               REPORT="このTexファイルに ${ALLOWED_LIST} 以外の年数がありました．もし使用したい場合は \"n年前\" といった表記にしてください:"
             fi
+            # 各ファイル名を改行付きで追加（バッククオートで囲む）
             for f in "${PROBLEM_FILES[@]}"; do
               REPORT+=$'\n- \`'"$f"'\`'
             done
             echo -e "$REPORT"
-            echo "::set-output name=message::$REPORT"
-            echo "::set-output name=failed::true"
+            # 新しい出力方法を用いてマルチライン文字列を設定
+            echo "message<<EOF" >> $GITHUB_OUTPUT
+            echo "$REPORT" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "failed=true" >> $GITHUB_OUTPUT
           else
             echo "全ての年チェックにPassed!"
-            echo "::set-output name=message::全ての年チェックにPassed!"
-            echo "::set-output name=failed::false"
+            echo "message=全ての年チェックにPassed!" >> $GITHUB_OUTPUT
+            echo "failed=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Comment to PR (Year Check)
