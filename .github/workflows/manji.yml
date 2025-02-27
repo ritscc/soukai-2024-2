@@ -1,7 +1,8 @@
-name: Year Check for .tex files
+name: manji-CheckYear
 
 on:
   pull_request:
+    # PR 作成・更新時 (reopen ではなく opened と synchronize)
     types: [opened, synchronize]
     paths: '**.tex'
 
@@ -9,41 +10,41 @@ jobs:
   check_year:
     runs-on: ubuntu-latest
     steps:
-      # リポジトリ全体をチェックアウト
+      # リポジトリのソースコードをすべてチェックアウト
       - name: Checkout Repository
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
-      # 変更された .tex ファイル一覧を取得する
-      - name: 変更された .tex ファイルの抽出
+      # 変更された .tex ファイル一覧を取得
+      - name: Extracting modified .tex files
         id: changed-files
         run: |
           FILES=$(git diff ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} --diff-filter=AM --name-only -- '*.tex')
           echo "対象ファイル: $FILES"
           echo "::set-output name=files::$FILES"
 
-      # リポジトリ名から年とバッチ番号を抽出し、変更ファイル内の4桁の数字が許容される年以外の場合はレポートを作成する
-      - name: リポジトリの年チェック
+      # リポジトリ名から年情報とバッチ番号を抽出し、
+      # 変更ファイル内の4桁の数字が許容される年（バッチが1なら YEAR、バッチが2なら YEAR と YEAR+1）以外ならエラーとして記録
+      - name: Year check
         id: year-check
-        shell: bash
         run: |
-          # GitHub.repository は "owner/soukai-2024-1" の形式を想定
+          # GitHub に設定されているリポジトリ名は "owner/soukatu-2024-1" といった形式を想定
           REPO_FULL="${{ github.repository }}"
           REPO_NAME="${REPO_FULL#*/}"
           echo "リポジトリ名: $REPO_NAME"
-
-          if [[ "$REPO_NAME" =~ ^soukai-([0-9]{4})-([12])$ ]]; then
+          
+          if [[ "$REPO_NAME" =~ ^soukatu-([0-9]{4})-([12])$ ]]; then
             YEAR="${BASH_REMATCH[1]}"
             BATCH="${BASH_REMATCH[2]}"
             echo "抽出された年: $YEAR, バッチ: $BATCH"
           else
-            echo "リポジトリ名が想定フォーマットと一致しません。例: soukai-<year>-<1 or 2>"
-            echo "::set-output name=message::リポジトリ名の形式が正しくありません: $REPO_NAME"
-            exit 0
+            echo "リポジトリ名が予期した形式に一致しません。例: soukatu-<year>-<1 or 2>"
+            echo "::set-output name=failed::true"
+            exit 1
           fi
 
-          # バッチ番号が 1 の場合は許容される年は YEAR のみ、2 の場合は YEAR および (YEAR+1)
+          # バッチ番号が 1 なら許容される年は YEAR のみ、2 なら YEAR および (YEAR+1)
           if [ "$BATCH" -eq 1 ]; then
             ALLOWED_YEARS=("$YEAR")
           else
@@ -55,19 +56,20 @@ jobs:
           FILES="${{ steps.changed-files.outputs.files }}"
           if [ -z "$FILES" ]; then
             echo "変更された .tex ファイルはありません。"
-            echo "::set-output name=message::変更された .tex ファイルはありませんでした。"
+            echo "::set-output name=message::"
+            echo "::set-output name=failed::false"
             exit 0
           fi
 
           ERROR=0
           REPORT=""
+          # 各ファイルについて、grep で 4 桁の数字を抽出し、許容リストに含まれるか確認
           for file in $FILES; do
             if [ ! -f "$file" ]; then
               echo "ファイル $file が存在しません。スキップします。"
               continue
             fi
             echo "チェック中のファイル: $file"
-            # 各行の中から4桁の数字をすべて抽出してチェック
             while IFS= read -r line; do
               for num in $(echo "$line" | grep -oE '[0-9]{4}'); do
                 ALLOWED=0
@@ -86,16 +88,27 @@ jobs:
           done
 
           if [ $ERROR -eq 1 ]; then
-            echo -e "年チェックで問題があります:\n$REPORT"
-            echo "::set-output name=message::年チェックで問題が検出されました:\n$REPORT"
+            echo -e "年チェックでエラーが発生:\n$REPORT"
+            echo "::set-output name=message::年チェックで問題を検出しました:\n$REPORT"
+            echo "::set-output name=failed::true"
           else
             echo "全ての年チェックに合格しました。"
-            echo "::set-output name=message::全ての年チェックに合格しました。"
+            echo "::set-output name=message::"
+            echo "::set-output name=failed::false"
           fi
+        shell: bash
 
-      # PR にコメントをアップサート（エラーがある場合も、単にコメントで通知する）
-      - name: PRにコメントをアップサート
+      # 問題のある場合、PR にコメントをアップサートする（実行結果を表示）
+      - name: Comment to PR
+        if: always()
         uses: marocchino/sticky-pull-request-comment@v1
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           message: ${{ steps.year-check.outputs.message }}
+
+      # 年チェックに問題があれば、ジョブ自体を失敗させる
+      - name: complete Job
+        if: steps.year-check.outputs.failed == 'true'
+        run: |
+          echo "年チェックでエラーが検出されました。"
+          exit 1
