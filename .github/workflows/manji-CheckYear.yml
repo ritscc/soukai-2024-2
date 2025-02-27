@@ -101,10 +101,11 @@ jobs:
             echo "::set-output name=failed::false"
           fi
 
-      - name: Comment to PR
+      - name: Comment to PR (Year Check)
         uses: marocchino/sticky-pull-request-comment@v1
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          header: "[Year Check]" 
           message: ${{ steps.year-check.outputs.message }}
 
       - name: Fail job if error detected
