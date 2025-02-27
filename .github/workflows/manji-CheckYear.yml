@@ -25,7 +25,6 @@ jobs:
         id: year-check
         shell: bash
         run: |
-          # GitHub.repository は "owner/soukai-2024-1" の形式を想定
           REPO_FULL="${{ github.repository }}"
           REPO_NAME="${REPO_FULL#*/}"
           echo "リポジトリ名: $REPO_NAME"
@@ -37,21 +36,25 @@ jobs:
           else
             echo "リポジトリ名が予期した形式に一致しません。例: soukai-<year>-<1 or 2>"
             echo "::set-output name=message::リポジトリ名の形式が正しくありません: $REPO_NAME"
+            echo "::set-output name=failed::false"
             exit 0
           fi
 
+          # バッチ番号が 1 の場合は許容される年は YEAR のみ、2 の場合は YEAR および (YEAR+1)
           if [ "$BATCH" -eq 1 ]; then
             ALLOWED_YEARS=("$YEAR")
           else
             NEXT_YEAR=$((YEAR + 1))
             ALLOWED_YEARS=("$YEAR" "$NEXT_YEAR")
           fi
-          echo "許容される年: ${ALLOWED_YEARS[@]}"
+          ALLOWED_LIST=$(IFS=", "; echo "${ALLOWED_YEARS[*]}")
+          echo "許容される年: $ALLOWED_LIST"
 
           FILES="${{ steps.changed-files.outputs.files }}"
           if [ -z "$FILES" ]; then
             echo "変更された .tex ファイルはありません。"
             echo "::set-output name=message::変更された .tex ファイルはありませんでした。"
+            echo "::set-output name=failed::false"
             exit 0
           fi
 
@@ -64,7 +67,6 @@ jobs:
             fi
             echo "チェック中のファイル: $file"
             FILE_HAS_ERROR=0
-            # ファイル内の4桁の数字を抽出し、許容される数字でなければフラグをセット
             while IFS= read -r line; do
               for num in $(echo "$line" | grep -oE '[0-9]{4}'); do
                 ALLOWED=0
@@ -86,16 +88,17 @@ jobs:
           done
 
           if [ ${#PROBLEM_FILES[@]} -gt 0 ]; then
-            ALLOWED_LIST=$(IFS=", "; echo "${ALLOWED_YEARS[*]}")
-            MESSAGE="以下のファイルに ${ALLOWED_LIST} 以外の年数がありました\n"
+            REPORT="以下のファイルに ${ALLOWED_LIST} 以外の年数がありました\n"
             for f in "${PROBLEM_FILES[@]}"; do
-              MESSAGE+="- $f\n"
+              REPORT+="- $f\n"
             done
-            echo -e "$MESSAGE"
-            echo "::set-output name=message::$MESSAGE"
+            echo -e "$REPORT"
+            echo "::set-output name=message::$REPORT"
+            echo "::set-output name=failed::true"
           else
             echo "全ての年チェックにPassed!"
             echo "::set-output name=message::全ての年チェックにPassed!"
+            echo "::set-output name=failed::false"
           fi
 
       - name: Comment to PR
@@ -103,3 +106,9 @@ jobs:
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           message: ${{ steps.year-check.outputs.message }}
+
+      - name: Fail job if error detected
+        if: steps.year-check.outputs.failed == 'true'
+        run: |
+          echo "年チェックで問題が検出されました。CI をエラー終了します。"
+          exit 1
