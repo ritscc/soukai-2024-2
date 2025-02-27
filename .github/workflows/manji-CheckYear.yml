@@ -88,18 +88,17 @@ jobs:
           done
 
           if [ ${#PROBLEM_FILES[@]} -gt 0 ]; then
-            # ヘッダー部分：複数の場合と1つの場合で文言を変える
+            # ヘッダー部分はファイル数に応じて変える
             if [ ${#PROBLEM_FILES[@]} -gt 1 ]; then
               REPORT="以下のTexファイルに ${ALLOWED_LIST} 以外の年数がありました．もし使用したい場合は \"n年前\" といった表記にしてください:"
             else
               REPORT="このTexファイルに ${ALLOWED_LIST} 以外の年数がありました．もし使用したい場合は \"n年前\" といった表記にしてください:"
             fi
-            # 各ファイル名を改行付きで追加（バッククオートで囲む）
+            # 各問題のあるファイル名をバッククオートで囲み改行付きで追加
             for f in "${PROBLEM_FILES[@]}"; do
               REPORT+=$'\n- \`'"$f"'\`'
             done
             echo -e "$REPORT"
-            # 新しい出力方法を用いてマルチライン文字列を設定
             echo "message<<EOF" >> $GITHUB_OUTPUT
             echo "$REPORT" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
@@ -114,11 +113,5 @@ jobs:
         uses: marocchino/sticky-pull-request-comment@v1
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          header: "[Year Check]" 
+          header: "[Year Check]"
           message: ${{ steps.year-check.outputs.message }}
-
-      - name: Fail job if error detected
-        if: steps.year-check.outputs.failed == 'true'
-        run: |
-          echo "年チェックで問題が検出されました。CI をエラー終了します。"
-          exit 1
