@@ -17,9 +17,13 @@ jobs:
       - name: Extracting modified .tex files
         id: changed-files
         run: |
+          # 変更された .tex ファイル一覧を抽出（各ファイルが改行区切りになる）
           FILES=$(git diff ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} --diff-filter=AM --name-only -- '*.tex')
           echo "対象ファイル: $FILES"
-          echo "::set-output name=files::$FILES"
+          # GITHUB_OUTPUT を使ってマルチライン出力する
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          echo "$FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Year check
         id: year-check
@@ -40,7 +44,7 @@ jobs:
             exit 0
           fi
 
-          # バッチ番号が 1 の場合は許容される年は YEAR のみ、2 の場合は YEAR および (YEAR+1)
+          # バッチ番号が 1 の場合は YEAR のみ、2 の場合は YEAR および (YEAR+1) を許容する
           if [ "$BATCH" -eq 1 ]; then
             ALLOWED_YEARS=("$YEAR")
           else
@@ -58,6 +62,8 @@ jobs:
             exit 0
           fi
 
+          # IFS を改行に設定して、各行（ファイル名）でループ処理できるようにする
+          IFS=$'\n'
           PROBLEM_FILES=()
 
           for file in $FILES; do
@@ -88,13 +94,11 @@ jobs:
           done
 
           if [ ${#PROBLEM_FILES[@]} -gt 0 ]; then
-            # ヘッダー部分はファイル数に応じて変える
             if [ ${#PROBLEM_FILES[@]} -gt 1 ]; then
               REPORT="以下のTexファイルに ${ALLOWED_LIST} 以外の年数がありました．もし使用したい場合は \"n年前\" といった表記にしてください:"
             else
               REPORT="このTexファイルに ${ALLOWED_LIST} 以外の年数がありました．もし使用したい場合は \"n年前\" といった表記にしてください:"
             fi
-            # 各問題のあるファイル名をバッククオートで囲み改行付きで追加
             for f in "${PROBLEM_FILES[@]}"; do
               REPORT+=$'\n- \`'"$f"'\`'
             done
@@ -115,3 +119,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           header: "[Year Check]"
           message: ${{ steps.year-check.outputs.message }}
+
+      # ※ このジョブは、問題があっても CI をエラー終了させず、PR のコメントで結果を更新します。
