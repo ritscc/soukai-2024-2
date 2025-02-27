@@ -19,12 +19,13 @@ jobs:
         run: |
           FILES=$(git diff ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} --diff-filter=AM --name-only -- '*.tex')
           echo "対象ファイル: $FILES"
-          echo "::set-output name=files::$FILES"
+          echo "files=$FILES" >> $GITHUB_OUTPUT
 
       - name: Year check
         id: year-check
         shell: bash
         run: |
+          # リポジトリ名から対象の年とバッチ番号を抽出
           REPO_FULL="${{ github.repository }}"
           REPO_NAME="${REPO_FULL#*/}"
           echo "リポジトリ名: $REPO_NAME"
@@ -35,12 +36,14 @@ jobs:
             echo "抽出された年: $YEAR, バッチ: $BATCH"
           else
             echo "リポジトリ名が予期した形式に一致しません。例: soukai-<year>-<1 or 2>"
-            echo "::set-output name=message::リポジトリ名の形式が正しくありません: $REPO_NAME"
-            echo "::set-output name=failed::false"
+            {
+              echo "message=リポジトリ名の形式が正しくありません: $REPO_NAME"
+              echo "failed=false"
+            } >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # バッチ番号が 1 の場合は許容される年は YEAR のみ、2 の場合は YEAR および (YEAR+1)
+          # バッチ番号が 1 の場合は許容される年は YEAR のみ。2 の場合は YEAR および (YEAR+1)
           if [ "$BATCH" -eq 1 ]; then
             ALLOWED_YEARS=("$YEAR")
           else
@@ -50,16 +53,20 @@ jobs:
           ALLOWED_LIST=$(IFS=", "; echo "${ALLOWED_YEARS[*]}")
           echo "許容される年: $ALLOWED_LIST"
 
+          # 変更されたファイルの一覧を取得
           FILES="${{ steps.changed-files.outputs.files }}"
           if [ -z "$FILES" ]; then
             echo "変更された .tex ファイルはありません。"
-            echo "::set-output name=message::変更された .tex ファイルはありませんでした。"
-            echo "::set-output name=failed::false"
+            {
+              echo "message=変更された .tex ファイルはありませんでした。"
+              echo "failed=false"
+            } >> $GITHUB_OUTPUT
             exit 0
           fi
 
           PROBLEM_FILES=()
 
+          # 各ファイル内で年のチェックを実施
           for file in $FILES; do
             if [ ! -f "$file" ]; then
               echo "ファイル $file が存在しません。スキップします。"
@@ -87,29 +94,36 @@ jobs:
             fi
           done
 
-            if [ ${#PROBLEM_FILES[@]} -gt 0 ]; then
-              REPORT="以下のファイルに ${ALLOWED_LIST} 以外の年数がありました．
-            もし使用したい場合は \"n年前\" といった表記にしてください
-            
-            "
-              for f in "${PROBLEM_FILES[@]}"; do
-                REPORT+="- $f
-            "
-              done
+          # エラーがあった場合、レポートを作成（実際の改行文字を利用）
+          if [ ${#PROBLEM_FILES[@]} -gt 0 ]; then
+            REPORT="以下のファイルに ${ALLOWED_LIST} 以外の年数がありました．
+もし使用したい場合は \"n年前\" といった表記にしてください
+
+"
+            for f in "${PROBLEM_FILES[@]}"; do
+              REPORT+="- $f
+"
+            done
+            echo "$REPORT"
+            {
+              echo "message<<EOF"
               echo "$REPORT"
-              echo "::set-output name=message::$REPORT"
-              echo "::set-output name=failed::true"
-            else
-              echo "全ての年チェックにPassed!"
-              echo "::set-output name=message::全ての年チェックにPassed!"
-              echo "::set-output name=failed::false"
-            fi
+              echo "EOF"
+              echo "failed=true"
+            } >> $GITHUB_OUTPUT
+          else
+            echo "全ての年チェックにPassed!"
+            {
+              echo "message=全ての年チェックにPassed!"
+              echo "failed=false"
+            } >> $GITHUB_OUTPUT
+          fi
 
       - name: Comment to PR (Year Check)
         uses: marocchino/sticky-pull-request-comment@v1
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          header: "[Year Check]" 
+          header: "[Year Check]"
           message: ${{ steps.year-check.outputs.message }}
 
       - name: Fail job if error detected
