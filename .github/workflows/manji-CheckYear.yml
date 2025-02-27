@@ -74,7 +74,7 @@ jobs:
                   fi
                 done
                 if [ $ALLOWED -eq 0 ]; then
-                  REPORT+="${file}: 許容外の年 '$num' が検出されました\n"
+                  REPORT+="${file}: 許容外の年 '$num' が検出されました"
                   ERROR=1
                 fi
               done
@@ -82,11 +82,11 @@ jobs:
           done
 
           if [ $ERROR -eq 1 ]; then
-            echo -e "年チェックでエラーが発生:\n$REPORT"
-            echo "::set-output name=message::年チェックで問題を検出しました:\n$REPORT"
+            echo -e "年チェックでエラーが発生:$REPORT"
+            echo "::set-output name=message::年チェックで問題を検出しました:$REPORT"
             echo "::set-output name=failed::true"
           else
-            echo "全ての年チェックに合格しました。"
+            echo "全ての年チェックにPassed!。"
             echo "::set-output name=message::"
             echo "::set-output name=failed::false"
           fi
