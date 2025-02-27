@@ -10,13 +10,11 @@ jobs:
   check_year:
     runs-on: ubuntu-latest
     steps:
-      # リポジトリのソースコードをすべてチェックアウト
       - name: Checkout Repository
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
-      # 変更された .tex ファイル一覧を取得
       - name: Extracting modified .tex files
         id: changed-files
         run: |
@@ -24,8 +22,6 @@ jobs:
           echo "対象ファイル: $FILES"
           echo "::set-output name=files::$FILES"
 
-      # リポジトリ名から年情報とバッチ番号を抽出し、
-      # 変更ファイル内の4桁の数字が許容される年（バッチが1なら YEAR、バッチが2なら YEAR と YEAR+1）以外ならエラーとして記録
       - name: Year check
         id: year-check
         run: |
@@ -44,7 +40,6 @@ jobs:
             exit 1
           fi
 
-          # バッチ番号が 1 なら許容される年は YEAR のみ、2 なら YEAR および (YEAR+1)
           if [ "$BATCH" -eq 1 ]; then
             ALLOWED_YEARS=("$YEAR")
           else
@@ -63,7 +58,6 @@ jobs:
 
           ERROR=0
           REPORT=""
-          # 各ファイルについて、grep で 4 桁の数字を抽出し、許容リストに含まれるか確認
           for file in $FILES; do
             if [ ! -f "$file" ]; then
               echo "ファイル $file が存在しません。スキップします。"
@@ -98,7 +92,6 @@ jobs:
           fi
         shell: bash
 
-      # 問題のある場合、PR にコメントをアップサートする（実行結果を表示）
       - name: Comment to PR
         if: always()
         uses: marocchino/sticky-pull-request-comment@v1
@@ -106,7 +99,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           message: ${{ steps.year-check.outputs.message }}
 
-      # 年チェックに問題があれば、ジョブ自体を失敗させる
       - name: complete Job
         if: steps.year-check.outputs.failed == 'true'
         run: |
